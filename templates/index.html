@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Розв'язок СЛР{% endblock %}
+
+{% block content %}
+    <h1>Розв'язок системи лінійних рівнянь (Ax = b)</h1>
+    <form action="/solve" method="post">
+        
+        <label for="matrix_a"><b>Матриця A</b> (рядки розділяйте переносом, числа в рядку - пробілом):</label><br>
+        <textarea name="matrix_a" placeholder="2 1 -1&#10;-3 -1 2&#10;-2 1 2" required></textarea><br>
+
+        <label for="vector_b"><b>Вектор b</b> (числа розділяйте пробілом):</label><br>
+        <textarea name="vector_b" style="min-height: 30px;" placeholder="8 -11 -3" required></textarea><br>
+
+        <button type="submit">Розв'язати</button>
+    </form>
+{% endblock %}

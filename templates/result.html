@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Результат{% endblock %}
+
+{% block content %}
+    <h1>Результат обчислення</h1>
+    {% if solution is not none %}
+        <div class="solution">
+            <h2>Розв'язок (вектор x):</h2>
+            <pre>{{ solution }}</pre>
+        </div>
+    {% elif error %}
+        <div class="error">
+            <p>{{ error }}</p>
+        </div>
+    {% endif %}
+    <br>
+    <a href="/">Повернутись до розв'язку</a>
+{% endblock %}

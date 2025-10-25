@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}{% endblock %}</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background-color: #f4f4f9; }
+        .container { max-width: 800px; margin: auto; padding: 20px; }
+        nav { background: #333; color: white; padding: 1rem; }
+        nav a { color: white; text-decoration: none; margin-right: 15px; }
+        nav .user-info { float: right; }
+        .flash-message { padding: 1rem; margin: 1rem 0; border-radius: 5px; color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+
+    <div style="position: fixed; bottom: 10px; right: 10px; background-color: #eee; padding: 5px; border-radius: 3px; font-size: 12px;">
+    Оброблено сервером: <strong>{{ server_name }}</strong>
+    </div>
+    <form action="/solve" method="post">
+    </form>
+    
+    <nav>
+        <a href="{{ url_for('index') }}">Головна</a>
+        <div class="user-info">
+            {% if current_user.is_authenticated %}
+                <span>Вітаємо, {{ current_user.username }}!</span>
+                <a href="{{ url_for('logout') }}">Вийти</a>
+            {% else %}
+                <a href="{{ url_for('login') }}">Увійти</a>
+                <a href="{{ url_for('register') }}">Реєстрація</a>
+            {% endif %}
+        </div>
+    </nav>
+    <div class="container">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="flash-message">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </div>
+
+
+</body>
+</html>
