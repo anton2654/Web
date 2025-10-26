@@ -29,9 +29,11 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
+        remember = True if request.form.get('remember') else False
+        
         user = User.query.filter_by(username=username).first()
         if user and bcrypt.check_password_hash(user.password_hash, password):
-            login_user(user)
+            login_user(user , remember=remember)
             return redirect(url_for('index'))
         else:
             flash('Неправильний логін або пароль.')
