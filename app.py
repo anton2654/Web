@@ -1,19 +1,19 @@
 import numpy as np
+import os
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models import db, User
-import os
 
-app = Flask(__name__)
 
-# 'postgresql://КОРИСТУВАЧ:ПАРОЛЬ@ХОСТ:ПОРТ/НАЗВА_БД'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:2392697000@localhost:5432/matrix_db'
+app = Flask(__name__) 
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:2392697000@localhost:5432/matrix_db' 
 app.config['SECRET_KEY'] = 'a-very-secret-key'
 
 db.init_app(app)
 bcrypt = Bcrypt(app)
-login_manager = LoginManager(app)
+login_manager = LoginManager()
+login_manager.init_app(app)
 login_manager.login_view = 'login'
 
 @login_manager.user_loader
@@ -23,6 +23,47 @@ def load_user(user_id):
 with app.app_context():
     db.create_all()
 
+#МЕТОД ГАУСА
+def gaussian_elimination(a_matrix, b_vector):
+    a = np.copy(a_matrix).astype(float) # Працюємо з копіями
+    b = np.copy(b_vector).astype(float)
+    n = len(b)
+    
+    #1. Прямий хід (Forward Elimination)
+    for k in range(n - 1):
+        if abs(a[k, k]) < 1e-10: 
+            found_pivot = False
+            for i in range(k + 1, n):
+                if abs(a[i, k]) > 1e-10:
+                    a[[k, i]] = a[[i, k]] 
+                    b[[k, i]] = b[[i, k]] 
+                    found_pivot = True
+                    break
+            if not found_pivot:
+                 raise np.linalg.LinAlgError("Матриця сингулярна або вимагає складнішого pivoting.")
+                 
+        for i in range(k + 1, n):
+            if a[k, k] == 0: 
+                 raise np.linalg.LinAlgError("Нульовий діагональний елемент після pivoting.")
+            factor = a[i, k] / a[k, k]
+            a[i, k:] = a[i, k:] - factor * a[k, k:]
+            b[i] = b[i] - factor * b[k]
+        
+    if abs(a[n-1, n-1]) < 1e-10:
+         raise np.linalg.LinAlgError("Матриця сингулярна після прямого ходу.")
+
+    # Зворотний хід (Back Substitution) 
+    x = np.zeros(n)
+    for i in range(n - 1, -1, -1): 
+        if a[i, i] == 0:
+             raise ValueError("Нульовий діагональний елемент під час зворотного ходу.")
+        sum_ax = np.dot(a[i, i + 1:], x[i + 1:])
+        x[i] = (b[i] - sum_ax) / a[i, i]
+
+    return {
+        "solution": x.tolist()
+    }
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -30,10 +71,9 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         remember = True if request.form.get('remember') else False
-        
         user = User.query.filter_by(username=username).first()
         if user and bcrypt.check_password_hash(user.password_hash, password):
-            login_user(user , remember=remember)
+            login_user(user, remember=remember)
             return redirect(url_for('index'))
         else:
             flash('Неправильний логін або пароль.')
@@ -44,15 +84,15 @@ def register():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
+        password2 = request.form.get('password2')
 
         existing_user = User.query.filter_by(username=username).first()
         if existing_user:
             flash('Користувач з таким іменем вже існує.')
             return redirect(url_for('register'))
 
-        if password != confirm_password :
-            flash("Passwords are not equal!")
+        if password != password2:
+            flash("Паролі не збігаються!")
             return redirect(url_for('register'))
 
         hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
@@ -73,49 +113,59 @@ def logout():
 @login_required
 def index():
     server_name = os.environ.get('SERVER_NAME', 'Невідомий сервер') 
-
     return render_template('index.html', server_name=server_name)
+
+
+MAX_MATRIX_SIZE = 100
 
 @app.route('/solve', methods=['POST'])
 @login_required
 def solve():
-    server_name = os.environ.get('SERVER_NAME', 'Невідомий сервер')
+    server_name = os.environ.get('SERVER_NAME', 'Невідомий сервер') 
+    results = {} 
+    error_message = None
+
     try:
         matrix_a_str = request.form.get('matrix_a')
         vector_b_str = request.form.get('vector_b')
 
-        a_rows = matrix_a_str.strip().split('\n')
-        A = [list(map(float, row.split())) for row in a_rows]
-        A = np.array(A)
+        try:
+            a_rows_str = [row.strip() for row in matrix_a_str.strip().split('\n') if row.strip()]
+            b_elements_str = vector_b_str.strip().split()
 
-        b = list(map(float, vector_b_str.strip().split()))
-        b = np.array(b)
+            if not a_rows_str or not b_elements_str:
+                 raise ValueError("Матриця або вектор порожні.")
+
+            A = np.array([list(map(float, row.split())) for row in a_rows_str])
+            B = np.array(list(map(float, b_elements_str)))
+        except ValueError:
+            raise ValueError("Некоректний формат чисел у матриці або векторі.")
+
+        n = A.shape[0]
+        if n == 0:
+             raise ValueError("Матриця не може бути порожньою.")
+        if A.shape[1] != n or len(B) != n:
+            raise ValueError("Матриця A має бути квадратною, а її розмірність повинна збігатися з розмірністю вектора B.")
         
-        if A.shape[0] != A.shape[1] or A.shape[0] != len(b):
-            raise ValueError("Розмірності матриці А та вектора b не сумісні.")
+        if n > MAX_MATRIX_SIZE:
+             raise ValueError(f"Розмір матриці ({n}x{n}) перевищує максимально допустимий ({MAX_MATRIX_SIZE}x{MAX_MATRIX_SIZE}).")
 
-        solution = np.linalg.solve(A, b)
-        return render_template('result.html', solution=solution, server_name=server_name)
+        try:
+            solution_np = np.linalg.solve(A, B)
+            results['numpy'] = {"solution": solution_np.tolist()}
+        except np.linalg.LinAlgError as e:
+            raise ValueError(f"Матриця є сингулярною або близькою до неї (помилка NumPy: {e})") 
+        results['gaussian'] = gaussian_elimination(A, B) 
 
     except Exception as e:
-        error_message = f"Помилка: {e}"
-        return render_template('result.html', error=error_message, server_name=server_name)
+        error_message = f"Помилка обробки: {e}"
 
-@app.route('/api/userinfo')
-def user_info():
-    if 'Authorization' in request.headers:
-        api_key = request.headers['Authorization'].replace('Bearer ', '', 1)
-        user = User.query.filter_by(api_key=api_key).first()
-        if user:
-            return {
-                "id": user.id,
-                "username": user.username,
-                "api_key": user.api_key 
-            }
-        else:
-            return {"error": "Invalid API Key"}, 401
-    else:
-        return {"error": "Authorization header is missing"}, 401
+    return render_template('result.html', 
+                           results=results, 
+                           error=error_message, 
+                           server_name=server_name)
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)

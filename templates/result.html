@@ -4,16 +4,38 @@
 
 {% block content %}
     <h1>Результат обчислення</h1>
-    {% if solution is not none %}
-        <div class="solution">
-            <h2>Розв'язок (вектор x):</h2>
-            <pre>{{ solution }}</pre>
-        </div>
-    {% elif error %}
+
+    {% if error %}
         <div class="error">
             <p>{{ error }}</p>
         </div>
+    {% elif results %}
+        <div class="result-block" style="margin-bottom: 20px; padding: 15px; background-color: #f0f0f0; border-radius: 5px;">
+            <h2>Метод Гауса</h2>
+            {% if results.gaussian and results.gaussian.solution %}
+                <pre>{{ results.gaussian.solution }}</pre>
+            {% elif results.gaussian and results.gaussian.error %}
+                <p style="color: red;">Помилка: {{ results.gaussian.error }}</p>
+            {% else %}
+                <p>Результат методу Гауса відсутній.</p>
+            {% endif %}
+        </div>
+        
+        <div class="result-block" style="padding: 15px; background-color: #e9ecef; border-radius: 5px;">
+            <h2>Точний розв'язок (NumPy)</h2>
+            {% if results.numpy and results.numpy.solution %}
+                <pre>{{ results.numpy.solution }}</pre>
+            {% elif results.numpy and results.numpy.error %}
+                 <p style="color: red;">Помилка: {{ results.numpy.error }}</p>
+            {% else %}
+                <p>Результат NumPy відсутній.</p>
+            {% endif %}
+        </div>
+
+    {% else %}
+         <p>Немає результатів для відображення.</p>
     {% endif %}
-    <br>
+    
+    <br><br>
     <a href="/">Повернутись до розв'язку</a>
 {% endblock %}

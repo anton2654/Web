@@ -1,13 +1,10 @@
-# Віртуальне середовище
+
 venv/
 
-# Кеш Python
 __pycache__/
 
-# Тимчасові файли VS Code
 .vscode/
 tempCodeRunnerFile.py
 
-# Файли баз даних SQLite
 *.db
 database.db

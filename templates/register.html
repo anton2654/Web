@@ -4,13 +4,23 @@
 
 {% block content %}
     <h2>Реєстрація нового користувача</h2>
-    <form method="post">
-        <label for="username">Ім'я користувача:</label><br>
-        <input type="text" name="username" required><br><br>
-        <label for="password">Пароль:</label><br>
-        <input type="password" name="password" required><br><br>
-        <label for="confirm_password">Повторити пароль:</label><br>
-        <input type="password" name="confirm_password" required><br><br>
+    <form id="register-form" method="post">
+        <label for="register-username">Ім'я користувача:</label><br>
+        <input type="text" id="register-username" name="username" required><br>
+        <span class="error-message" id="register-username-error"></span><br>
+
+        <label for="register-password">Пароль:</label><br>
+        <input type="password" id="register-password" name="password" required><br>
+        <span class="error-message" id="register-password-error"></span><br>
+
+        <label for="register-password2">Повторіть пароль:</label><br>
+        <input type="password" id="register-password2" name="password2" required><br>
+        <span class="error-message" id="register-password2-error"></span><br>
+
         <button type="submit">Зареєструватися</button>
     </form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/register.js') }}"></script>
 {% endblock %}

@@ -1,20 +1,24 @@
-{% extends "base.html" %}
+{% extends "base.html" %} 
 
-{% block title %}Вхід{% endblock %}
+{% block title %}Вхід{% endblock %} 
 
 {% block content %}
-    <h2>Вхід в систему</h2>
-    <form method="post">
-        <label for="username">Ім'я користувача:</label><br>
-        <input type="text" name="username" required><br><br>
-        <label for="password">Пароль:</label><br>
-        <input type="password" name="password" required><br><br>
-        <input type="checkbox" name="remember"> Запам'ятати мене<br><br>
-        <button type="submit">Увійти</button>
-    </form>
+<h2>Вхід в систему</h2>
+<form id="login-form" method="post">
+    <label for="login-username">Ім'я користувача:</label><br />
+    <input type="text" id="login-username" name="username" /><br />
+    <span class="error-message" id="login-username-error"></span><br />
+
+    <label for="login-password">Пароль:</label><br />
+    <input type="password" id="login-password" name="password" /><br />
+    <span class="error-message" id="login-password-error"></span><br />
+
+    <input type="checkbox" name="remember" /> Запам'ятати мене<br /><br />
+    
+    <button type="submit">Увійти</button>
+</form>
 {% endblock %}
 
-
-
-
-
+{% block scripts %}
+    <script src="{{ url_for('static', filename='js/login.js') }}"></script>
+{% endblock %}
