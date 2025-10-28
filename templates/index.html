@@ -16,6 +16,62 @@
         
         <button type="submit">Розв'язати</button>
     </form>
+    <hr style="margin: 30px 0;"> <h2>Історія обчислень</h2>
+    {% if tasks %}
+        <table border="1" style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Час</th>
+                    <th>Матриця A</th>
+                    <th>Вектор B</th>
+                    <th>Статус</th>
+                    <th>Рез. Гауса</th>
+                    <th>Рез. NumPy</th>
+                    <th>Помилка</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for task in tasks %}
+                    <tr>
+                        <td>{{ task.id }}</td>
+                        <td>{{ task.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td><pre style="max-height: 100px; overflow: auto;">{{ task.input_matrix }}</pre></td>
+                        <td><pre style="max-height: 50px; overflow: auto;">{{ task.input_vector }}</pre></td>
+                        <td>
+                            {% if task.status == 'completed' %}
+                                <span style="color: green;">✅ Виконано</span>
+                            {% elif task.status == 'failed' %}
+                                <span style="color: red;">❌ Помилка</span>
+                            {% else %}
+                                <span style="color: orange;">⏳ Обробка</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if task.result_gaussian %}
+                                <pre>{{ task.result_gaussian }}</pre>
+                                <small>({{ "%.1f"|format(task.time_gaussian_ms) }} мс)</small>
+                            {% endif %}
+                        </td>
+                         <td>
+                            {% if task.result_numpy %}
+                                <pre>{{ task.result_numpy }}</pre>
+                                <small>({{ "%.1f"|format(task.time_numpy_ms) }} мс)</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if task.error_message %}
+                                <small style="color: red;">{{ task.error_message }}</small>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>У вас ще немає жодного завдання.</p>
+    {% endif %}
 {% endblock %}
 
 {% block scripts %}

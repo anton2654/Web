@@ -3,7 +3,7 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from models import db, User
+from models import db, User , Task
 
 
 app = Flask(__name__) 
@@ -113,8 +113,9 @@ def logout():
 @login_required
 def index():
     server_name = os.environ.get('SERVER_NAME', 'Невідомий сервер') 
-    return render_template('index.html', server_name=server_name)
-
+    user_tasks = Task.query.filter_by(user_id=current_user.id).order_by(Task.timestamp.desc()).all()
+    
+    return render_template('index.html', server_name=server_name, tasks=user_tasks)
 
 MAX_MATRIX_SIZE = 100
 
