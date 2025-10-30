@@ -29,6 +29,50 @@
             color: #555; 
             z-index: 1000;
         }
+
+
+
+        #history-table {
+            width: 100%;
+            border-collapse: collapse; /* Прибирає подвійні межі */
+            font-size: 0.9em;
+            margin-top: 20px;
+            table-layout: fixed; /* Допомагає контролювати ширину колонок */
+        }
+
+        #history-table th, 
+        #history-table td {
+            border: 1px solid #ddd; /* Чіткі сірі межі */
+            padding: 8px; /* Відступи всередині комірок */
+            text-align: left; /* Вирівнювання тексту */
+            vertical-align: top; /* Вирівнювання по верху */
+            word-wrap: break-word; /* Перенос слів, якщо не поміщаються */
+        }
+
+        #history-table th {
+            background-color: #f2f2f2; /* Світлий фон для заголовків */
+            font-weight: bold;
+        }
+
+        /* Стилі для прокрутки в комірках з матрицею/вектором */
+        #history-table td pre {
+            max-height: 100px; /* Обмежуємо висоту */
+            overflow-y: auto;  /* Додаємо вертикальну прокрутку */
+            background-color: #f8f9fa; /* Світлий фон для коду */
+            padding: 5px;
+            margin: 0; /* Прибираємо стандартні відступи pre */
+            white-space: pre-wrap; /* Зберігаємо форматування і переносимо рядки */
+        }
+
+        /* Опціонально: встановимо приблизну ширину колонок */
+        #history-table th:nth-child(1) { width: 5%; } /* ID */
+        #history-table th:nth-child(2) { width: 15%; } /* Час */
+        #history-table th:nth-child(3) { width: 25%; } /* Матриця A */
+        #history-table th:nth-child(4) { width: 15%; } /* Вектор B */
+        #history-table th:nth-child(5) { width: 10%; } /* Статус */
+        #history-table th:nth-child(6) { width: 10%; } /* Рез. Гауса */
+        #history-table th:nth-child(8) { width: 10%; } /* Помилка */
+
     </style>
 </head>
 <body>

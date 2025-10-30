@@ -4,76 +4,235 @@
 
 {% block content %}
     <h1>Розв'язок системи лінійних рівнянь (Ax = b)</h1>
-    <form action="/solve" method="post">
-        
-        <label for="matrix_a"><b>Матриця A</b> (рядки розділяйте переносом, числа в рядку - пробілом):</label><br>
-        <textarea name="matrix_a" placeholder="2 1 -1&#10;-3 -1 2&#10;-2 1 2" required></textarea><br>
-        <span class="error-message" id="matrix_a-error"></span><br> 
 
-        <label for="vector_b"><b>Вектор b</b> (числа розділяйте пробілом):</label><br>
-        <textarea name="vector_b" style="min-height: 30px;" placeholder="8 -11 -3" required></textarea><br>
+    {% if error %}
+        {% endif %}
+
+    <form id="solver-form"> <label for="matrix_a"><b>Матриця A</b>...</label><br>
+        <textarea id="matrix_a" name="matrix_a" rows="5" placeholder="2 1 -1&#10;-3 -1 2&#10;-2 1 2">{{ matrix_a_val or '' }}</textarea>
+        <span class="error-message" id="matrix_a-error"></span><br>
+
+        <label for="vector_b"><b>Вектор B</b>...</label><br>
+        <textarea id="vector_b" name="vector_b" rows="2" style="min-height: 30px;" placeholder="8 -11 -3">{{ vector_b_val or '' }}</textarea>
         <span class="error-message" id="vector_b-error"></span><br>
         
         <button type="submit">Розв'язати</button>
+        <span id="loading-indicator" style="display: none; margin-left: 10px;">Обробка... ⏳</span> 
     </form>
-    <hr style="margin: 30px 0;"> <h2>Історія обчислень</h2>
-    {% if tasks %}
-        <table border="1" style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Час</th>
-                    <th>Матриця A</th>
-                    <th>Вектор B</th>
-                    <th>Статус</th>
-                    <th>Рез. Гауса</th>
-                    <th>Рез. NumPy</th>
-                    <th>Помилка</th>
+
+    <hr style="margin: 30px 0;">
+
+<h2>Історія обчислень</h2>
+{% if tasks %}
+    <table id="history-table"> 
+        <thead>
+            <tr>
+                <th>ID</th><th>Час</th><th>Матриця A</th><th>Вектор B</th>
+                <th>Статус</th>
+                <th>Прогрес</th>
+                <th>Рез. Гауса</th> 
+                <th>Помилка</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in tasks %}
+                <tr data-task-id="{{ task.id }}"> 
+                    <td>{{ task.id }}</td>
+                    <td>{{ task.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td><pre>{{ task.input_matrix }}</pre></td>
+                    <td><pre>{{ task.input_vector }}</pre></td>
+                    <td class="task-status">
+                        {% if task.status == 'completed' %}<span style="color: green;">✅ Виконано</span>
+                        {% elif task.status == 'failed' %}<span style="color: red;">❌ Помилка</span>
+                        {% else %}<span style="color: orange;">⏳ Обробка</span>
+                        {% endif %}
+                    </td>
+                    <td class="task-progress"> 
+                        {% if task.progress >= 0 %}
+                            {{ task.progress }}%
+                            <progress value="{{ task.progress }}" max="100" style="width: 100%;"></progress>
+                        {% endif %}
+                    </td>
+                    <td class="task-result-gaussian"> {% if task.result_gaussian %}
+                            <pre>{{ task.result_gaussian }}</pre>
+                        {% endif %}
+                    </td>
+                    <td class="task-error">
+                        {% if task.error_message %}
+                        <small style="color: red;">{{ task.error_message }}</small>
+                        {% endif %}
+                    </td>
                 </tr>
-            </thead>
-
-            <tbody>
-                {% for task in tasks %}
-                    <tr>
-                        <td>{{ task.id }}</td>
-                        <td>{{ task.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                        <td><pre style="max-height: 100px; overflow: auto;">{{ task.input_matrix }}</pre></td>
-                        <td><pre style="max-height: 50px; overflow: auto;">{{ task.input_vector }}</pre></td>
-                        <td>
-                            {% if task.status == 'completed' %}
-                                <span style="color: green;">✅ Виконано</span>
-                            {% elif task.status == 'failed' %}
-                                <span style="color: red;">❌ Помилка</span>
-                            {% else %}
-                                <span style="color: orange;">⏳ Обробка</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if task.result_gaussian %}
-                                <pre>{{ task.result_gaussian }}</pre>
-                                <small>({{ "%.1f"|format(task.time_gaussian_ms) }} мс)</small>
-                            {% endif %}
-                        </td>
-                         <td>
-                            {% if task.result_numpy %}
-                                <pre>{{ task.result_numpy }}</pre>
-                                <small>({{ "%.1f"|format(task.time_numpy_ms) }} мс)</small>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if task.error_message %}
-                                <small style="color: red;">{{ task.error_message }}</small>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <p>У вас ще немає жодного завдання.</p>
-    {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p id="no-tasks-message">У вас ще немає жодного завдання.</p>
+{% endif %}
 {% endblock %}
-
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/index.js') }}"></script>
+    <script src="{{ url_for('static', filename='matrix.js') }}"></script> 
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const solverForm = document.getElementById('solver-form');
+            // ✅ Перевіряємо, чи існує тіло таблиці перед пошуком
+            const historyTableBody = document.querySelector('#history-table tbody'); 
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const noTasksMessage = document.getElementById('no-tasks-message');
+            let pendingTaskIds = []; // Масив ID завдань, що очікують оновлення
+            let pollingInterval; // Змінна для таймера
+
+            // --- Функція для додавання нового рядка в таблицю (оптимістично) ---
+            function addPendingTaskRow(matrixA, vectorB) {
+                if (!historyTableBody) return null; 
+                if (noTasksMessage) noTasksMessage.style.display = 'none'; 
+                const newRow = historyTableBody.insertRow(0); 
+                newRow.dataset.taskId = 'pending...'; 
+                
+                // Додаємо комірку для прогресу
+                newRow.innerHTML = `
+                    <td>...</td><td>Зараз</td><td><pre>${matrixA}</pre></td>
+                    <td><pre>${vectorB}</pre></td>
+                    <td class="task-status"><span style="color: orange;">⏳ Обробка</span></td>
+                    <td class="task-progress">0% <progress value="0" max="100" style="width: 100%;"></progress></td> 
+                    <td class="task-result-gaussian"></td> 
+                    <td class="task-error"></td>
+                `;
+                return newRow; 
+            }
+            
+            // --- Функція для оновлення рядка таблиці ---
+            function updateTaskRow(taskId, data) {
+                if (!historyTableBody) return; 
+                const row = historyTableBody.querySelector(`tr[data-task-id="${taskId}"]`);
+                if (!row) return;
+
+                const statusCell = row.querySelector('.task-status');
+                const progressCell = row.querySelector('.task-progress'); // Знаходимо комірку прогресу
+                const resultCell = row.querySelector('.task-result-gaussian'); 
+                const errorCell = row.querySelector('.task-error');
+
+                // Оновлюємо прогрес, якщо він є
+                if (progressCell && data.progress !== undefined && data.progress >= 0) {
+                     progressCell.innerHTML = `${data.progress}% <progress value="${data.progress}" max="100" style="width: 100%;"></progress>`;
+                } else if (progressCell && data.status === 'failed') {
+                     progressCell.innerHTML = ''; // Очищаємо прогрес при помилці
+                }
+
+                if (data.status === 'completed') {
+                    statusCell.innerHTML = '<span style="color: green;">✅ Виконано</span>';
+                    // ... (код оновлення результату Гауса) ...
+                    errorCell.innerHTML = '';
+                    pendingTaskIds = pendingTaskIds.filter(id => id !== taskId); 
+                } else if (data.status === 'failed') {
+                    statusCell.innerHTML = '<span style="color: red;">❌ Помилка</span>';
+                    if (resultCell) resultCell.innerHTML = ''; 
+                    errorCell.innerHTML = `<small style="color: red;">${data.error_message || 'Невідома помилка'}</small>`;
+                    pendingTaskIds = pendingTaskIds.filter(id => id !== taskId);
+                } 
+            }
+            // --- Функція для опитування сервера ---
+            async function pollTaskStatuses() {
+                if (pendingTaskIds.length === 0) {
+                    clearInterval(pollingInterval); // Зупиняємо опитування, якщо немає активних завдань
+                    pollingInterval = null;
+                    console.log("Polling stopped."); // Додаємо лог
+                    return;
+                }
+                
+                const idsParam = pendingTaskIds.join(',');
+                console.log("Polling for IDs:", idsParam); // Додаємо лог
+                try {
+                    const response = await fetch(`/tasks_status?ids=${idsParam}`);
+                    if (!response.ok) {
+                        console.error('Помилка при опитуванні статусу:', response.status, response.statusText);
+                        // Якщо сервер повернув помилку (напр. 404, 500), можливо варто зупинити опитування
+                        // clearInterval(pollingInterval); 
+                        // pollingInterval = null;
+                        return;
+                    }
+                    const statuses = await response.json();
+                    
+                    // Оновлюємо рядки в таблиці
+                    for (const taskId in statuses) {
+                        updateTaskRow(parseInt(taskId), statuses[taskId]);
+                    }
+
+                    // Якщо після оновлення не залишилось завдань, зупиняємо таймер
+                     if (pendingTaskIds.length === 0 && pollingInterval) {
+                         clearInterval(pollingInterval); 
+                         pollingInterval = null;
+                         console.log("Polling stopped after update."); // Додаємо лог
+                     }
+
+                } catch (error) {
+                    console.error('Помилка мережі при опитуванні:', error);
+                    // Можливо варто зупинити опитування при помилці мережі
+                    // clearInterval(pollingInterval); 
+                    // pollingInterval = null;
+                }
+            }
+
+            // --- Обробник відправки форми ---
+            if (solverForm) {
+                solverForm.addEventListener('submit', async function(event) {
+                    event.preventDefault(); // Забороняємо стандартну відправку
+                    loadingIndicator.style.display = 'inline'; // Показуємо індикатор
+
+                    const formData = new FormData(solverForm);
+                    const matrixA = formData.get('matrix_a');
+                    const vectorB = formData.get('vector_b');
+                    
+                    // Додаємо тимчасовий рядок
+                    const tempRow = addPendingTaskRow(matrixA, vectorB);
+
+                    try {
+                        // Відправляємо дані на /solve 
+                        const response = await fetch('/solve', {
+                            method: 'POST',
+                            body: formData 
+                        });
+
+                        // Перевіряємо, чи сервер відповів успішно (навіть якщо це redirect)
+                        if (!response.ok && response.redirected === false) { 
+                             // Якщо не redirect і не ok, ймовірно помилка сервера
+                             throw new Error(`Server responded with status ${response.status}`);
+                        }
+                        
+                        // Після відправки перезавантажуємо сторінку, щоб побачити новий таск з ID
+                        // Це найпростіший спосіб зараз
+                        window.location.reload(); 
+                        
+                    } catch (error) {
+                        console.error('Помилка відправки форми:', error);
+                        if(tempRow) tempRow.remove(); // Видаляємо тимчасовий рядок, якщо він був створений
+                        alert('Сталася помилка при відправці завдання.');
+                    } finally {
+                        loadingIndicator.style.display = 'none'; // Ховаємо індикатор
+                    }
+                });
+            }
+
+            // --- Ініціалізація опитування при завантаженні сторінки ---
+            if (historyTableBody) { // ✅ Перевіряємо, чи існує тіло таблиці
+                const initialPendingTasks = historyTableBody.querySelectorAll('tr');
+                initialPendingTasks.forEach(row => {
+                    const statusCell = row.querySelector('.task-status span');
+                    // ✅ Шукаємо статус 'pending' або 'Обробка'
+                    if (statusCell && (row.dataset.taskId !== 'pending...') && statusCell.textContent.includes('Обробка')) { 
+                    pendingTaskIds.push(parseInt(row.dataset.taskId));
+                    }
+                });
+            }
+
+             // Запускаємо опитування, якщо є що опитувати
+             if (pendingTaskIds.length > 0 && !pollingInterval) {
+                 console.log("Starting initial polling for IDs:", pendingTaskIds); // Додаємо лог
+                 pollingInterval = setInterval(pollTaskStatuses, 3000); // Опитувати кожні 3 секунди
+             } else {
+                 console.log("No pending tasks found on initial load."); // Додаємо лог
+             }
+        });
+    </script>
 {% endblock %}
