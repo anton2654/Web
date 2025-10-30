@@ -27,20 +27,22 @@ with app.app_context():
     db.create_all()
 
 # --- МЕТОД ГАУСА (з прогресом та time.sleep) ---
-def gaussian_elimination(app, task_id, a_matrix, b_vector): 
+def gaussian_elimination(app , task_id ,a_matrix, b_vector): 
+        # --- Початок ---
+
     def update_progress(progress_value):
          with app.app_context(): 
             task = db.session.get(Task, task_id)
             if task:
                 task.progress = progress_value
                 db.session.commit()
-            print(f"[Thread-{task_id}] Progress updated to {progress_value}%") # Для дебагу
-
-    # --- Початок ---
+    
     a = np.copy(a_matrix).astype(float) 
     b = np.copy(b_vector).astype(float)
     n = len(b)
-    update_progress(5) # Початковий прогрес
+    update_progress(5)
+    time.sleep(1)
+ # Початковий прогрес
 
     # --- 1. Прямий хід (Forward Elimination) ---
     for k in range(n - 1):
@@ -56,7 +58,7 @@ def gaussian_elimination(app, task_id, a_matrix, b_vector):
             a[i, k:] = a[i, k:] - factor * a[k, k:] 
             b[i] = b[i] - factor * b[k]
             # --- ШТУЧНА ЗАТРИМКА ---
-            if n > 1: time.sleep(2) # Робимо затримку меншою для великих матриць
+            if n > 1: time.sleep(1) # Робимо затримку меншою для великих матриць
             
         current_progress = 5 + int(((k + 1) / (n - 1)) * 45) if n > 1 else 50
         update_progress(min(current_progress, 50)) 
@@ -78,12 +80,14 @@ def gaussian_elimination(app, task_id, a_matrix, b_vector):
         
         current_progress = 50 + int(((n - i) / n) * 49) if n > 0 else 99
         update_progress(min(current_progress, 99)) 
+    
 
     x_rounded = np.round(x, 2)
     solution_str = ' '.join(map(str, x_rounded))
 
     update_progress(99) 
-    
+    time.sleep(1)
+
     return {
         "solution": solution_str,
     }
@@ -146,122 +150,61 @@ def index():
     return render_template('index.html', server_name=server_name, tasks=user_tasks)
 
 
-# Функція, яка буде виконувати обчислення у фоновому потоці
-def run_calculation(app, task_id, matrix_a_str, vector_b_str):
-    print(f"[Thread-{task_id}] Starting calculation...")
-    
-    # Створюємо тимчасові змінні для зберігання результату
-    final_status = 'pending'
-    final_result_gaussian = None
-    final_progress = 0
-    final_error = None
-
-    try:
-        # Нам потрібен app_context для оновлення прогресу всередині gaussian_elimination
-        with app.app_context():
-            # --- Парсинг і валідація ---
-            print(f"[Thread-{task_id}] Parsing inputs...")
-            try:
-                a_rows_str = [row.strip() for row in matrix_a_str.strip().split('\n') if row.strip()]
-                b_elements_str = vector_b_str.strip().split()
-                if not a_rows_str: raise ValueError("Матриця A не може бути порожньою.")
-                if not b_elements_str: raise ValueError("Вектор B не може бути порожнім.")
-                A = np.array([list(map(float, row.split())) for row in a_rows_str])
-                B = np.array(list(map(float, b_elements_str)))
-            except (ValueError, TypeError) as parse_error:
-                 print(f"[Thread-{task_id}] Parsing error: {parse_error}")
-                 raise ValueError(f"Некоректний формат чисел: {parse_error}")
-
-            print(f"[Thread-{task_id}] Validating dimensions...")
-            n = A.shape[0]
-            if n == 0: raise ValueError("Матриця не може бути порожньою після обробки.")
-            if A.shape[1] != n or len(B) != n: raise ValueError("Матриця A має бути квадратною...")
-            if n > MAX_MATRIX_SIZE: raise ValueError(f"Розмір матриці ({n}x{n}) перевищує...")
-
-            # --- Виконання методу Гауса ---
-            print(f"[Thread-{task_id}] Running Gaussian elimination...")
-            # gaussian_elimination тепер оновлює прогрес в БД самостійно
-            gaussian_result = gaussian_elimination(app, task.id, A, B) 
-            results['gaussian'] = gaussian_result 
-            print(f"[Thread-{task_id}] Calculation successful.")
-            task.status = 'completed'
-
-            task.result_gaussian = results['gaussian']['solution']
-
-            task.progress = 100
-
-    except Exception as e:
-        # Якщо сталася помилка
-        final_error = str(e)
-        final_status = 'failed'
-        final_progress = -1 
-        print(f"[Thread-{task_id}] Calculation failed: {e}")
-
-    finally:
-        # --- Фінальний запис у БД ---
-        # Створюємо НОВИЙ, чистий app_context *лише* для цього запису
-        with app.app_context():
-            try:
-                # Отримуємо свіжий об'єкт Task з БД
-                task = db.session.get(Task, task_id)
-                if task:
-                    # Оновлюємо його
-                    task.status = final_status
-                    task.result_gaussian = final_result_gaussian
-                    task.progress = final_progress
-                    task.error_message = final_error
-                    # Зберігаємо зміни
-                    db.session.commit()
-                    print(f"[Thread-{task_id}] DB commit successful. Final status: {task.status}")
-                else:
-                    print(f"[Thread-{task_id}] Task not found in finally block.")
-            except Exception as db_error:
-                 print(f"[Thread-{task_id}] !!! DB commit FAILED: {db_error}")
-                 db.session.rollback()
 
 MAX_MATRIX_SIZE = 100
 
 @app.route('/solve', methods=['POST'])
 @login_required
 def solve():
-    # ... (код без змін) ...
     matrix_a_input = request.form.get('matrix_a', '')
     vector_b_input = request.form.get('vector_b', '')
-    new_task = Task(
+    
+    # ❌ Прибираємо 'threading', 'run_calculation'. Все робимо тут.
+    task = Task(
         input_matrix=matrix_a_input,
         input_vector=vector_b_input,
         user_id=current_user.id,
         status='pending' 
     )
-    db.session.add(new_task)
-    db.session.commit() 
-    thread = threading.Thread(target=run_calculation, args=(app, new_task.id, matrix_a_input, vector_b_input))
-    thread.start()
-    flash(f'Завдання {new_task.id} додано в обробку.')
+    
+    try:
+        # --- Парсинг і валідація ---
+        a_rows_str = [row.strip() for row in matrix_a_input.strip().split('\n') if row.strip()]
+        b_elements_str = vector_b_input.strip().split()
+        if not a_rows_str: raise ValueError("Матриця A не може бути порожньою.")
+        if not b_elements_str: raise ValueError("Вектор B не може бути порожнім.")
+        A = np.array([list(map(float, row.split())) for row in a_rows_str])
+        B = np.array(list(map(float, b_elements_str)))
+
+        n = A.shape[0]
+        if n == 0: raise ValueError("Матриця не може бути порожньою.")
+        if A.shape[1] != n or len(B) != n: raise ValueError("Матриця A має бути квадратною.")
+        if n > MAX_MATRIX_SIZE: raise ValueError(f"Розмір матриці ({n}x{n}) перевищує ліміт ({MAX_MATRIX_SIZE}).")
+
+        # --- Виконання методу Гауса ---
+        # ✅ Викликаємо спрощену функцію
+        solution_str = gaussian_elimination(app, task.id , A, B) 
+        
+        # ✅ Оновлюємо таск успішним результатом
+        task.status = 'completed'
+        task.result_gaussian = solution_str
+        task.progress = 100 
+
+    except Exception as e:
+        # ✅ Оновлюємо таск помилкою
+        task.status = 'failed'
+        task.error_message = str(e)
+        task.progress = -1
+        flash(f"Помилка обробки: {e}") # Показуємо flash-повідомлення
+
+    finally:
+        # ✅ Зберігаємо таск (з результатом або помилкою) в БД
+        db.session.add(task)
+        db.session.commit()
+
+    # ✅ Просто перезавантажуємо головну сторінку
     return redirect(url_for('index'))
 
-
-@app.route('/tasks_status')
-@login_required
-def tasks_status():
-    # ... (код без змін) ...
-    task_ids_str = request.args.get('ids')
-    if not task_ids_str:
-        return jsonify({"error": "No task IDs provided"}), 400
-    try:
-        task_ids = [int(id) for id in task_ids_str.split(',')]
-    except ValueError:
-        return jsonify({"error": "Invalid task IDs format"}), 400
-    tasks = Task.query.filter(Task.user_id == current_user.id, Task.id.in_(task_ids)).all()
-    status_map = {}
-    for task in tasks:
-        status_map[task.id] = {
-            'status': task.status,
-            'result_gaussian': task.result_gaussian, 
-            'progress': task.progress,
-            'error_message': task.error_message
-        }
-    return jsonify(status_map)
 
 if __name__ == '__main__':
     app.run(debug=True)
