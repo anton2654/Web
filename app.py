@@ -9,7 +9,7 @@ import json
 import threading
 
 
-app = Flask(__name__, static_folder='js') # Використовуємо 'js' як static_folder
+app = Flask(__name__) 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:2392697000@localhost:5432/matrix_db' 
 app.config['SECRET_KEY'] = 'a-very-secret-key'
 
@@ -21,7 +21,6 @@ login_manager.login_view = 'login'
 
 @login_manager.user_loader
 def load_user(user_id):
-    # Використовуємо db.session.get() замість застарілого User.query.get()
     return db.session.get(User, int(user_id))
 
 with app.app_context():
@@ -74,16 +73,19 @@ def gaussian_elimination(app, task_id, a_matrix, b_vector):
             raise ValueError("Нульовий діагональний елемент під час зворотного ходу.")
         sum_ax = np.dot(a[i, i + 1:], x[i + 1:])
         x[i] = (b[i] - sum_ax) / a[i, i] if n > 0 else 0 # Захист від ділення на нуль для n=0
-        # --- ШТУЧНА ЗАТРИМКА ---
+
         if n > 0: time.sleep(0.05 / n) 
         
         current_progress = 50 + int(((n - i) / n) * 49) if n > 0 else 99
         update_progress(min(current_progress, 99)) 
 
+    x_rounded = np.round(x, 2)
+    solution_str = ' '.join(map(str, x_rounded))
+
     update_progress(99) 
     
     return {
-        "solution": x.tolist(),
+        "solution": solution_str,
     }
 # --- КІНЕЦЬ МЕТОДУ ГАУСА ---
 
@@ -179,13 +181,14 @@ def run_calculation(app, task_id, matrix_a_str, vector_b_str):
             # --- Виконання методу Гауса ---
             print(f"[Thread-{task_id}] Running Gaussian elimination...")
             # gaussian_elimination тепер оновлює прогрес в БД самостійно
-            gaussian_result = gaussian_elimination(app, task_id, A, B) 
+            gaussian_result = gaussian_elimination(app, task.id, A, B) 
+            results['gaussian'] = gaussian_result 
             print(f"[Thread-{task_id}] Calculation successful.")
+            task.status = 'completed'
 
-            # Зберігаємо результати у тимчасові змінні
-            final_status = 'completed'
-            final_result_gaussian = json.dumps(gaussian_result['solution']) 
-            final_progress = 100 
+            task.result_gaussian = results['gaussian']['solution']
+
+            task.progress = 100
 
     except Exception as e:
         # Якщо сталася помилка

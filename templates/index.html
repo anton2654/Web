@@ -83,6 +83,36 @@
             let pendingTaskIds = []; // Масив ID завдань, що очікують оновлення
             let pollingInterval; // Змінна для таймера
 
+
+            function formatSolution(jsonString) {
+                if (!jsonString || jsonString.length <= 2) {
+                    return ''; // Повертаємо порожній рядок, якщо даних немає
+                }
+                try {
+                    // Парсимо JSON
+                    const solution = JSON.parse(jsonString);
+                    // Округлюємо та об'єднуємо через <br>
+                    return solution.map(num => Number(num.toFixed(2))).join('<br>');
+                } catch(e) {
+                    return 'Помилка формату'; 
+                }
+            }
+
+            function formatInitialResults() {
+                if (!historyTableBody) return;
+                const rows = historyTableBody.querySelectorAll('tr[data-task-id]');
+                rows.forEach(row => {
+                    const resultCell = row.querySelector('.task-result-gaussian');
+                    if (resultCell) {
+                        const preElement = resultCell.querySelector('pre');
+                        if (preElement) {
+                            preElement.innerHTML = formatSolution(preElement.textContent);
+                            preElement.style.textAlign = "right";
+                            preElement.style.paddingRight = "10px";
+                        }
+                    }
+                });
+            }
             // --- Функція для додавання нового рядка в таблицю (оптимістично) ---
             function addPendingTaskRow(matrixA, vectorB) {
                 if (!historyTableBody) return null; 
@@ -123,6 +153,12 @@
                 if (data.status === 'completed') {
                     statusCell.innerHTML = '<span style="color: green;">✅ Виконано</span>';
                     // ... (код оновлення результату Гауса) ...
+                    
+                    if (resultCell && data.result_gaussian) { 
+                        resultCell.innerHTML = data.result_gaussian; // Більше ніякого JSON
+                    }
+                    
+
                     errorCell.innerHTML = '';
                     pendingTaskIds = pendingTaskIds.filter(id => id !== taskId); 
                 } else if (data.status === 'failed') {
@@ -147,9 +183,6 @@
                     const response = await fetch(`/tasks_status?ids=${idsParam}`);
                     if (!response.ok) {
                         console.error('Помилка при опитуванні статусу:', response.status, response.statusText);
-                        // Якщо сервер повернув помилку (напр. 404, 500), можливо варто зупинити опитування
-                        // clearInterval(pollingInterval); 
-                        // pollingInterval = null;
                         return;
                     }
                     const statuses = await response.json();
